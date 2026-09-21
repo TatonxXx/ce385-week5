@@ -2,6 +2,8 @@ import express from "express";
 
 const app = express();
 
+app.use(express.json());
+
 const TODOS = [
   { id: "1", title: "ทำการบ้าน", done: true, priority: "high" },
   { id: "2", title: "อ่านหนังสือ", done: true, priority: "high" },
@@ -9,25 +11,62 @@ const TODOS = [
   { id: "4", title: "ส่งงานอาจารย์", done: false, priority: "low" },
 ];
 
-app.get("/health", (req, res) => {
+const PRIORITIES = ["high", "normal", "low"];
+
+function validateTodo(req, res, next) {
+  const { title, priority } = req.body ?? {};
+
+  if (typeof title !== "string" || title.trim() === "") {
+    return res.status(400).json({
+      error: "ต้องมี title เป็นข้อความ",
+    });
+  }
+
+  if (priority !== undefined && !PRIORITIES.includes(priority)) {
+    return res.status(400).json({
+      error: "priority ไม่ถูกต้อง",
+    });
+  }
+
+  return next();
+}
+
+const todoRouter = express.Router();
+
+todoRouter.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-app.get("/todos", (req, res) => {
+todoRouter.get("/", (req, res) => {
   res.json(TODOS.map((t) => ({ ...t })));
 });
 
-app.get("/todos/:id", (req, res) => {
+todoRouter.get("/:id", (req, res) => {
   const todo = TODOS.find((t) => t.id === req.params.id);
 
   if (!todo) {
     return res.status(404).json({
-      error: `ไม่พบรายการ ${req.params.id}`
+      error: `ไม่พบรายการ ${req.params.id}`,
     });
   }
 
   return res.json({ ...todo });
 });
+
+todoRouter.post("/todos", validateTodo, (req, res) => {
+  const created = {
+    id: String(TODOS.length + 1),
+    title: req.body.title,
+    done: false,
+    priority: req.body.priority ?? "normal",
+  };
+
+  TODOS.push(created);
+
+  res.status(201).json({ ...created });
+});
+
+app.use("/api/v1/todos", todoRouter);
 
 app.listen(3000, () => {
   console.log("เซิร์ฟเวอร์ทำงานที่ http://localhost:3000");
